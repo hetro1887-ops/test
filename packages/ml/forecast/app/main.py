@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, Any
 from .forecaster import TFTForecaster
@@ -9,6 +10,10 @@ app = FastAPI(
   description="Exposes Temporal Fusion Transformer (TFT) style cash flow forecasting and simulations",
   version="1.0.0"
 )
+
+@app.get("/")
+def root():
+  return RedirectResponse(url="/docs")
 
 class TransactionItem(BaseModel):
   amount: float

@@ -175,7 +175,7 @@ class TransactionCategorizer:
         if self.session:
             features = self._text_to_features(text).reshape(1, -1)
             outputs = self.session.run(None, {"input": features})
-            probabilities = outputs[0][0]  # softmax output
+            probabilities = outputs[1][0]  # softmax output
             predicted_idx = int(np.argmax(probabilities))
             confidence = float(probabilities[predicted_idx])
             all_scores = {

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Any
 from .detector import AnomalyDetector
@@ -9,6 +10,10 @@ app = FastAPI(
   description="Exposes Isolation Forest + Rule-based transaction anomaly checks",
   version="1.0.0"
 )
+
+@app.get("/")
+def root():
+  return RedirectResponse(url="/docs")
 
 class TransactionItem(BaseModel):
   id: Optional[str] = None
