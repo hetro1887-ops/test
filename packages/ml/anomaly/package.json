@@ -1,0 +1,9 @@
+{
+  "name": "@finance/ml-anomaly",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "uvicorn app.main:app --port 8001 --reload",
+    "start": "uvicorn app.main:app --port 8001"
+  }
+}

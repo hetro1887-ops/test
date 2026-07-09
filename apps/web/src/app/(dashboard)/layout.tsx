@@ -14,6 +14,9 @@ import {
   Menu,
   X,
   Zap,
+  Sparkles,
+  PiggyBank,
+  RefreshCw,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -47,6 +50,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Transactions', href: '/transactions', icon: ArrowUpDown },
     { name: 'Accounts', href: '/accounts', icon: CreditCard },
+    { name: 'Subscriptions', href: '/subscriptions', icon: RefreshCw },
+    { name: 'Savings & Transfers', href: '/savings', icon: PiggyBank },
+    { name: 'AI Copilot', href: '/copilot', icon: Sparkles },
   ];
 
   const handleSignOut = async () => {

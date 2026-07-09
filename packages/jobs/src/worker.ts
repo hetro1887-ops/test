@@ -42,6 +42,20 @@ const enrichWorker = new Worker(
   }
 );
 
+// 4. Notifications & Digest Worker
+const notificationWorker = new Worker(
+  'notifications',
+  async (job) => {
+    // Import dynamically to avoid circular references/load ordering issues
+    const { handleNotificationJob } = await import('./workers/notifications');
+    await handleNotificationJob(job);
+  },
+  {
+    connection,
+    concurrency: 5,
+  }
+);
+
 // Logging lifecycle events
 syncWorker.on('completed', (job) => console.log(`[Sync Worker] Job ${job.id} completed.`));
 syncWorker.on('failed', (job, err) => console.error(`[Sync Worker] Job ${job?.id} failed:`, err));
@@ -52,6 +66,9 @@ categorizeWorker.on('failed', (job, err) => console.error(`[Categorize Worker] J
 enrichWorker.on('completed', (job) => console.log(`[Enrich Worker] Job ${job.id} completed.`));
 enrichWorker.on('failed', (job, err) => console.error(`[Enrich Worker] Job ${job?.id} failed:`, err));
 
+notificationWorker.on('completed', (job) => console.log(`[Notification Worker] Job ${job.id} completed.`));
+notificationWorker.on('failed', (job, err) => console.error(`[Notification Worker] Job ${job?.id} failed:`, err));
+
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
   console.log('[Worker Runner] Shutting down workers gracefully...');
@@ -59,6 +76,7 @@ process.on('SIGTERM', async () => {
     syncWorker.close(),
     categorizeWorker.close(),
     enrichWorker.close(),
+    notificationWorker.close(),
   ]);
   console.log('[Worker Runner] Shutdown complete.');
   process.exit(0);

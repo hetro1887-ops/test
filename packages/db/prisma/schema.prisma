@@ -49,8 +49,12 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  plaidItems PlaidItem[]
-  accounts   Account[]
+  plaidItems          PlaidItem[]
+  accounts            Account[]
+  anomalies           Anomaly[]
+  subscriptions       Subscription[]
+  transferSuggestions TransferSuggestion[]
+  savingGoals         SavingGoal[]
 
   @@index([email])
   @@map("users")
@@ -138,12 +142,15 @@ model Transaction {
   hash                              String         @unique
   mlCategory                        String?        @map("ml_category")
   mlConfidence                      Float?         @map("ml_confidence")
+  subscriptionId                    String?        @map("subscription_id")
   createdAt                         DateTime       @default(now()) @map("created_at")
   updatedAt                         DateTime       @updatedAt @map("updated_at")
 
-  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  merchant     Merchant?     @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  anomaly      Anomaly?
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
   @@index([merchantId])
@@ -216,4 +223,117 @@ model SyncLog {
   @@index([status])
   @@index([startedAt])
   @@map("sync_logs")
+}
+
+// ─── Anomaly ─────────────────────────────────────────────────────────────────
+
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AnomalyStatus {
+  UNRESOLVED
+  IGNORED
+  RESOLVED
+}
+
+model Anomaly {
+  id            String          @id @default(cuid())
+  transactionId String          @unique @map("transaction_id")
+  userId        String          @map("user_id")
+  score         Float
+  reasons       String[]
+  severity      AnomalySeverity @default(LOW)
+  status        AnomalyStatus   @default(UNRESOLVED)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([severity])
+  @@map("anomalies")
+}
+
+// ─── Subscription ────────────────────────────────────────────────────────────
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  UPGRADED
+  DOWNGRADED
+  PAUSED
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @map("user_id")
+  name             String
+  merchantName     String             @map("merchant_name")
+  amount           Decimal            @db.Decimal(19, 4)
+  frequency        String             @default("monthly") // monthly, yearly, weekly
+  nextPaymentDate  DateTime?          @map("next_payment_date")
+  status           SubscriptionStatus @default(ACTIVE)
+  cancellationUrl  String?            @map("cancellation_url")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ─── TransferSuggestion ──────────────────────────────────────────────────────
+
+enum TransferStatus {
+  SUGGESTED
+  APPROVED
+  REJECTED
+  EXECUTED
+  FAILED
+}
+
+model TransferSuggestion {
+  id             String         @id @default(cuid())
+  userId         String         @map("user_id")
+  sourceAccountId String         @map("source_account_id")
+  targetAccountId String         @map("target_account_id")
+  amount         Decimal        @db.Decimal(19, 4)
+  reason         String
+  status         TransferStatus @default(SUGGESTED)
+  executionId    String?        @map("execution_id") // Plaid Transfer / Stripe transfer ID
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("transfer_suggestions")
+}
+
+// ─── SavingGoal ──────────────────────────────────────────────────────────────
+
+model SavingGoal {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  name           String
+  targetAmount   Decimal  @map("target_amount") @db.Decimal(19, 4)
+  currentAmount  Decimal  @default(0) @map("current_amount") @db.Decimal(19, 4)
+  targetDate     DateTime? @map("target_date")
+  roundUpEnabled Boolean  @default(false) @map("round_up_enabled")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saving_goals")
 }
