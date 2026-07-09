@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { AccountBalances } from '@/components/dashboard/AccountBalances';
 import { CategoryCharts } from '@/components/dashboard/CategoryCharts';
 import { TransactionTable } from '@/components/dashboard/TransactionTable';
