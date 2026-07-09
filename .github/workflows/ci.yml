@@ -1,0 +1,130 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run type-check
+
+  test-web:
+    name: Test Web App
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finance_dashboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finance_dashboard_test
+      REDIS_URL: redis://localhost:6379
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      NEXTAUTH_SECRET: test-secret
+      NEXTAUTH_URL: http://localhost:3000
+      PLAID_CLIENT_ID: test
+      PLAID_SECRET: test
+      PLAID_ENV: sandbox
+      ML_SERVICE_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run db:generate
+      - run: pnpm run db:push
+      - run: pnpm run build
+      - run: pnpm run test
+
+  test-ml-api:
+    name: Test ML API
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: apps/ml-api/requirements.txt
+      - name: Install dependencies
+        working-directory: apps/ml-api
+        run: |
+          pip install -r requirements.txt
+          pip install pytest httpx
+      - name: Run ML tests
+        working-directory: apps/ml-api
+        run: python -m pytest tests/ -v
+      - name: Benchmark inference
+        working-directory: apps/ml-api
+        run: python scripts/benchmark.py
+
+  build-ml-docker:
+    name: Build ML API Docker
+    runs-on: ubuntu-latest
+    needs: test-ml-api
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        working-directory: apps/ml-api
+        run: docker build -t finance-ml-api:test .
+      - name: Test Docker image
+        run: |
+          docker run -d --name ml-test -p 8000:8000 finance-ml-api:test
+          sleep 10
+          curl -f http://localhost:8000/health || exit 1
+          docker stop ml-test
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [test-web, test-ml-api, build-ml-docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy (placeholder)
+        run: echo "Deploy step - configure for your hosting provider"

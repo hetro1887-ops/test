@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+.next/
+out/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Turbo
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ML Models
+*.onnx
+!apps/ml-service/models/.gitkeep
+
+# Prisma
+packages/db/prisma/migrations/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

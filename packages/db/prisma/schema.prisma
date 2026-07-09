@@ -1,0 +1,219 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum PlaidItemStatus {
+  ACTIVE
+  LOGIN_REQUIRED
+  ERROR
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT
+  LOAN
+  INVESTMENT
+  OTHER
+}
+
+enum PaymentChannel {
+  ONLINE
+  IN_STORE
+  OTHER
+}
+
+enum SyncStatus {
+  STARTED
+  COMPLETED
+  FAILED
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  plaidItems PlaidItem[]
+  accounts   Account[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// ─── PlaidItem ───────────────────────────────────────────────────────────────
+
+model PlaidItem {
+  id                   String          @id @default(cuid())
+  userId               String          @map("user_id")
+  accessTokenEncrypted String          @map("access_token_encrypted")
+  itemId               String          @unique @map("item_id")
+  institutionId        String          @map("institution_id")
+  institutionName      String          @map("institution_name")
+  cursor               String?
+  status               PlaidItemStatus @default(ACTIVE)
+  webhookUrl           String?         @map("webhook_url")
+  consentExpiresAt     DateTime?       @map("consent_expires_at")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts Account[]
+  syncLogs SyncLog[]
+
+  @@index([userId])
+  @@index([institutionId])
+  @@index([status])
+  @@map("plaid_items")
+}
+
+// ─── Account ─────────────────────────────────────────────────────────────────
+
+model Account {
+  id               String      @id @default(cuid())
+  userId           String      @map("user_id")
+  plaidItemId      String      @map("plaid_item_id")
+  plaidAccountId   String      @unique @map("plaid_account_id")
+  name             String
+  officialName     String?     @map("official_name")
+  type             AccountType
+  subtype          String?
+  mask             String?
+  currentBalance   Decimal     @default(0) @map("current_balance") @db.Decimal(19, 4)
+  availableBalance Decimal?    @map("available_balance") @db.Decimal(19, 4)
+  limitAmount      Decimal?    @map("limit_amount") @db.Decimal(19, 4)
+  isoCurrencyCode  String      @default("USD") @map("iso_currency_code")
+  lastSyncedAt     DateTime?   @map("last_synced_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plaidItem    PlaidItem     @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([plaidItemId])
+  @@index([type])
+  @@map("accounts")
+}
+
+// ─── Transaction ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id                                String         @id @default(cuid())
+  accountId                         String         @map("account_id")
+  plaidTransactionId                String         @unique @map("plaid_transaction_id")
+  merchantId                        String?        @map("merchant_id")
+  categoryId                        String?        @map("category_id")
+  amount                            Decimal        @db.Decimal(19, 4)
+  name                              String
+  merchantName                      String?        @map("merchant_name")
+  description                       String?
+  date                              DateTime
+  authorizedDate                    DateTime?      @map("authorized_date")
+  pending                           Boolean        @default(false)
+  paymentChannel                    PaymentChannel @default(OTHER)
+  transactionType                   String?        @map("transaction_type")
+  isoCurrencyCode                   String         @default("USD") @map("iso_currency_code")
+  locationCity                      String?        @map("location_city")
+  locationRegion                    String?        @map("location_region")
+  locationCountry                   String?        @map("location_country")
+  personalFinanceCategoryPrimary    String?        @map("pfc_primary")
+  personalFinanceCategoryDetailed   String?        @map("pfc_detailed")
+  hash                              String         @unique
+  mlCategory                        String?        @map("ml_category")
+  mlConfidence                      Float?         @map("ml_confidence")
+  createdAt                         DateTime       @default(now()) @map("created_at")
+  updatedAt                         DateTime       @updatedAt @map("updated_at")
+
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([merchantId])
+  @@index([categoryId])
+  @@index([date])
+  @@index([pending])
+  @@index([merchantName])
+  @@index([personalFinanceCategoryPrimary])
+  @@index([amount])
+  @@index([accountId, date])
+  @@map("transactions")
+}
+
+// ─── Merchant ────────────────────────────────────────────────────────────────
+
+model Merchant {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String   @map("display_name")
+  logoUrl     String?  @map("logo_url")
+  category    String?
+  website     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  transactions Transaction[]
+
+  @@index([name])
+  @@index([category])
+  @@map("merchants")
+}
+
+// ─── Category ────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String   @map("display_name")
+  parentId    String?  @map("parent_id")
+  icon        String?
+  color       String?
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+
+  transactions Transaction[]
+
+  @@index([parentId])
+  @@index([isSystem])
+  @@map("categories")
+}
+
+// ─── SyncLog ─────────────────────────────────────────────────────────────────
+
+model SyncLog {
+  id            String     @id @default(cuid())
+  plaidItemId   String     @map("plaid_item_id")
+  status        SyncStatus
+  addedCount    Int        @default(0) @map("added_count")
+  modifiedCount Int        @default(0) @map("modified_count")
+  removedCount  Int        @default(0) @map("removed_count")
+  errorMessage  String?    @map("error_message")
+  startedAt     DateTime   @default(now()) @map("started_at")
+  completedAt   DateTime?  @map("completed_at")
+
+  plaidItem PlaidItem @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+
+  @@index([plaidItemId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("sync_logs")
+}
