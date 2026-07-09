@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "dev": "tsx src/worker.ts",
     "worker": "tsx src/worker.ts"
   },
   "dependencies": {

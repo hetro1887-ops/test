@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "uvicorn app.main:app --port 8002 --reload",
-    "start": "uvicorn app.main:app --port 8002"
+    "dev": "uv run uvicorn app.main:app --port 8002",
+    "start": "uv run uvicorn app.main:app --port 8002"
   }
 }

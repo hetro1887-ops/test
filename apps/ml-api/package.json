@@ -1,0 +1,9 @@
+{
+  "name": "@finance/ml-categorizer",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn app.main:app --port 8000",
+    "start": "uv run uvicorn app.main:app --port 8000"
+  }
+}
